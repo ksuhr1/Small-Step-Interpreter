@@ -236,7 +236,7 @@ evalA expr mapstore =
           Expon     ->
             evalA e1 mapstore ^ evalA e2 mapstore
 
--- interpreter takes in statement, map and returns map
+--interpreter takes in statement, map and returns map
 interpret :: Stmt -> Map.Map String Integer -> Map.Map String Integer
 interpret var store =
   case var of
@@ -257,20 +257,16 @@ interpret var store =
 
 cleanData:: (Stmt, String) -> String
 cleanData (stmt, mapstore)  = do
-  show stmt++ ", "++ mapstore
-
-
+  "⇒ "++show stmt++ ", "++ mapstore
 
 helperstep::(Stmt, Map.Map String Integer, [String]) -> Maybe(Stmt, Map.Map String Integer,[String])
 helperstep (ast, state, result) =
   case smallstep(ast, state) of
     Just(ast', state') -> do
-      -- let mstring = Map.toList state'
-            --let resultData  = printMap(mstring)
             let smap = printMap(state')
-            let  resultData = cleanData(ast', smap)
-            --let resultData = forM_ state' (putStrLn .  cleanData)
-            helperstep(ast', state', result ++ [resultData])
+            let resultData = cleanData(ast', smap)
+            let cleanData = filter(/= '\n') resultData
+            helperstep(ast', state', result ++ [cleanData])
     Nothing            ->   do
             Just(ast, state, result)
 
@@ -282,15 +278,22 @@ smallstep (stmt, store) =
   case stmt of
     Assign str a1 -> Just(Skip, Map.insert str (evalA a1 store) store)
     Skip          -> Nothing
-    -- Skip          -> Just(stmt,store)
     If b1 c1 c2       -> do
       if evalBool b1 store == True
         then Just(c1, store)
         else Just(c2, store)
-    -- While b1 s1       ->
-    --   if evalBool b1 store
-    --     then interpret (While b1 s1) (interpret s1 store)
-    --     else Just(Skip, store)
+    Seq []           ->  Nothing
+    Seq (x:xs)       -> do
+      case smallstep(x, store) of
+        Just(x', store')  -> Just(Seq ([x'] ++ xs), store')
+        Nothing           -> do
+          if null xs
+            then Nothing
+            else Just(Seq xs, store)
+    While b1 s1       ->
+      if evalBool b1 store
+        then Just (Skip, store)
+        else Just(Skip, store)
 
 
 -- pretty printing
@@ -326,10 +329,14 @@ instance Show Stmt where
 -- utility function for printing the map in
 -- the correct format
 printMap :: Map.Map String Integer ->  String
-printMap theeMap = do
-  let extra = Map.toList theeMap
-  let func = \(key, value) -> key ++ "  " ++ show value
-  unlines $ map func extra
+printMap newMap = do
+  if newMap == Map.empty
+    then "{}"
+    else
+      do
+        let extra = Map.toList newMap
+        let func = \(key, value) -> "{"++ key ++ " → " ++ show value ++ "}"
+        unlines $ map func extra
 
 
 main = do
@@ -346,18 +353,3 @@ main = do
     -- let output = helperstep(ast, store)
     let Just(stmt, s_map, output) = helperstep(ast, store, [])
     mapM_ putStrLn(output)
-    -- forM_ output $ \j -> do
-    --   putStrLn "Here's a string"
-    --   forM_ j print
-    --   putStrLn "Not it's done"
-    -- putStr(output)
-
-    -- if state == Map.empty
-    --   then putStrLn "{}"
-    --   else
-    --     do
-    --       let mlist = Map.toList state
-    --       putStr("⇒ " ++ show stmt ++ ", ")
-    --       putStr("{")
-    --       printMap(mlist)
-    --       putStrLn("}")
