@@ -292,7 +292,7 @@ smallstep (stmt, store) =
             else Just(Seq xs, store)
     While b1 s1       ->
       if evalBool b1 store
-        then Just (Skip, store)
+        then Just(Seq([s1] ++ [While b1 s1]), store)
         else Just(Skip, store)
 
 
@@ -307,10 +307,25 @@ instance Show BExpr where
   show (BBinary Or a b) = "(" ++ show a ++ "∨" ++ show b ++ ")"
   show (BBinary And a b) = "(" ++ show a ++ "∧" ++ show b ++ ")"
 
+  -- --
+  -- data AExpr = Var String
+  --            | IntConst Integer
+  --            | Neg AExpr
+  --            | ABinary ABinOp AExpr AExpr
+  --
+  --
+  -- -- Arithmetic operators
+  -- data ABinOp = Add
+  --             | Subtract
+  --             | Multiply
+  --             | Divide
+  --             | Expon
+
 --Arithmetic expressions
 instance Show AExpr where
   show (IntConst n) = show n
   show (Var s) = s
+  show (Neg a) = "-" ++ show a
   show (ABinary Add a b) = "(" ++ show a ++ "+" ++ show b ++ ")"
   show (ABinary Subtract a b) = "(" ++ show a ++ "-" ++ show b ++ ")"
   show (ABinary Multiply a b) = "(" ++ show a ++ "*" ++ show b ++ ")"
