@@ -257,7 +257,7 @@ interpret var store =
 
 cleanData:: (Stmt, String) -> String
 cleanData (stmt, mapstore)  = do
-  "⇒ "++show stmt++ ", "++ mapstore
+  "⇒ "++show stmt++ ", "++ "{"++mapstore++"}"
 
 helperstep::(Stmt, Map.Map String Integer, [String]) -> Maybe(Stmt, Map.Map String Integer,[String])
 helperstep (ast, state, result) =
@@ -307,20 +307,6 @@ instance Show BExpr where
   show (BBinary Or a b) = "(" ++ show a ++ "∨" ++ show b ++ ")"
   show (BBinary And a b) = "(" ++ show a ++ "∧" ++ show b ++ ")"
 
-  -- --
-  -- data AExpr = Var String
-  --            | IntConst Integer
-  --            | Neg AExpr
-  --            | ABinary ABinOp AExpr AExpr
-  --
-  --
-  -- -- Arithmetic operators
-  -- data ABinOp = Add
-  --             | Subtract
-  --             | Multiply
-  --             | Divide
-  --             | Expon
-
 --Arithmetic expressions
 instance Show AExpr where
   show (IntConst n) = show n
@@ -345,13 +331,9 @@ instance Show Stmt where
 -- the correct format
 printMap :: Map.Map String Integer ->  String
 printMap newMap = do
-  if newMap == Map.empty
-    then "{}"
-    else
-      do
-        let extra = Map.toList newMap
-        let func = \(key, value) -> "{"++ key ++ " → " ++ show value ++ "}"
-        unlines $ map func extra
+  let extra = Map.toList newMap
+  let func = \(key, value) -> key ++ " → " ++ show value
+  unlines $ map func extra
 
 
 main = do
