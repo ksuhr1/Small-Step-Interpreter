@@ -2,6 +2,8 @@ module Main where
 -- libraries
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import qualified Data.Map.Strict as Map
+import Text.Parsec.Prim
+import Text.Parsec.Combinator
 import Data.List (intercalate)
 import Control.Monad (forM_)
 import Text.ParserCombinators.Parsec
@@ -13,16 +15,16 @@ import Data.List (foldl')
 import Control.Monad(forM_)
 
 -- Defining all the data structures
-
 -- Boolean expressions
 data BExpr = BoolConst Bool
            | Not BExpr
            | BBinary BBinOp BExpr BExpr
            | RBinary RBinOp AExpr AExpr
+               -- deriving (Show)
 
 
 -- Binary boolean operators
-data BBinOp = And | Or deriving (Show)
+data BBinOp = And | Or deriving(Show)
 
 -- Relational operators
 data RBinOp = Greater | Less | Eq deriving (Show)
@@ -32,7 +34,7 @@ data AExpr = Var String
            | IntConst Integer
            | Neg AExpr
            | ABinary ABinOp AExpr AExpr
-
+               -- deriving (Show)
 
 -- Arithmetic operators
 data ABinOp = Add
@@ -40,7 +42,7 @@ data ABinOp = Add
             | Multiply
             | Divide
             | Expon
-
+               -- deriving (Show)
 
 -- Statements
 data Stmt = Seq [Stmt]
@@ -48,7 +50,7 @@ data Stmt = Seq [Stmt]
           | If BExpr Stmt Stmt
           | While BExpr Stmt
           | Skip
-
+             -- deriving (Show)
 
 -- define syntax for While Language
 languageDef =
@@ -86,13 +88,14 @@ integer    = Token.integer    lexer -- parses an integer int
 semi       = Token.semi       lexer -- parses a semicolon  ;
 whiteSpace = Token.whiteSpace lexer -- parses whitespace " "
 brace      =  Token.braces    lexer -- parses braces {}
+semiSep    = Token.semiSep    lexer
 
 whileParser :: Parser Stmt
 whileParser = whiteSpace >> statement
 
 statement :: Parser Stmt
-statement =   parens statement
-          <|> brace statement
+statement =  brace statement
+          <|> parens statement
           <|> sequenceOfStmt
 
 -- If there are a sequences of statements separated by a semicolon
@@ -108,6 +111,14 @@ statement' =   ifStmt
            <|> whileStmt
            <|> skipStmt
            <|> assignStmt
+
+assignStmt :: Parser Stmt
+assignStmt =
+ do var  <- identifier
+    reservedOp ":="
+    expr <- aExpression
+    return $ Assign var expr
+
 
 -- define the parsers for all the possible statements
 ifStmt :: Parser Stmt
@@ -128,12 +139,7 @@ whileStmt =
      stmt <- statement
      return $ While cond stmt
 
-assignStmt :: Parser Stmt
-assignStmt =
-  do var  <- identifier
-     reservedOp ":="
-     expr <- aExpression
-     return $ Assign var expr
+
 
 skipStmt :: Parser Stmt
 skipStmt = reserved "skip" >> return Skip
@@ -257,43 +263,47 @@ interpret var store =
 
 cleanData:: (Stmt, String) -> String
 cleanData (stmt, mapstore)  = do
-  "⇒ "++show stmt++ ", "++ "{"++mapstore++"}"
+  "⇒ "++show stmt++ ", "++ "{"++ intercalate ", " (lines mapstore)++"}"
 
-helperstep::(Stmt, Map.Map String Integer, [String]) -> Maybe(Stmt, Map.Map String Integer,[String])
-helperstep (ast, state, result) =
-  case smallstep(ast, state) of
-    Just(ast', state') -> do
-            let smap = printMap(state')
-            let resultData = cleanData(ast', smap)
-            let cleanData = filter(/= '\n') resultData
-            helperstep(ast', state', result ++ [cleanData])
-    Nothing            ->   do
-            Just(ast, state, result)
+helperstep::(Stmt, Map.Map String Integer, [String], Integer ) -> Maybe(Stmt, Map.Map String Integer,[String], Integer)
+helperstep (ast, state, result, counter) =
+  if counter < 10000
+    then do
+      case smallstep(ast, state, counter) of
+        Just(ast', state', c') -> do
+                let smap = printMap(state')
+                let resultData = cleanData(ast', smap)
+                Just(putStrLn(resultData))
+                let cleanData = filter(/= '\n') resultData
+                helperstep(ast', state', result ++ [cleanData], c'+1)
+        Nothing            ->   do
+                Just(ast, state, result, counter+1)
+    else Just(ast, state, result, counter)
 
 
 -- input: AST, s
 -- returns: remaining AST, s'
-smallstep:: (Stmt, Map.Map String Integer) -> Maybe(Stmt, Map.Map String Integer)
-smallstep (stmt, store) =
+smallstep:: (Stmt, Map.Map String Integer, Integer) -> Maybe(Stmt, Map.Map String Integer, Integer)
+smallstep (stmt, store, counter) =
   case stmt of
-    Assign str a1 -> Just(Skip, Map.insert str (evalA a1 store) store)
+    Assign str a1 -> Just(Skip, Map.insert str (evalA a1 store) store, counter)
     Skip          -> Nothing
     If b1 c1 c2       -> do
       if evalBool b1 store == True
-        then Just(c1, store)
-        else Just(c2, store)
+        then Just(c1, store, counter)
+        else Just(c2, store, counter)
     Seq []           ->  Nothing
     Seq (x:xs)       -> do
-      case smallstep(x, store) of
-        Just(x', store')  -> Just(Seq ([x'] ++ xs), store')
+      case smallstep(x, store, counter) of
+        Just(x', store', c')  -> Just(Seq ([x'] ++ xs), store', c')
         Nothing           -> do
           if null xs
             then Nothing
-            else Just(Seq xs, store)
+            else Just(Seq xs, store, counter)
     While b1 s1       ->
       if evalBool b1 store
-        then Just(Seq([s1] ++ [While b1 s1]), store)
-        else Just(Skip, store)
+        then Just(Seq([s1] ++ [While b1 s1]), store, counter)
+        else Just(Skip, store, counter)
 
 
 -- pretty printing
@@ -340,13 +350,15 @@ main = do
     -- getContents reads everything from standard input
     contents <-  getContents
     let inputStr = (unlines (lines contents))
-    --let ast = parseString inputStr
+    --print("content", contents)
     let ast = parseString contents
     let store = Map.empty
-    --print(ast)
+    let count = 0
+    -- print(ast)
 
     --let (stmt, s_map) = smallstep(ast, store)
     --let (stmt, state) = helperstep(ast, store)
-    -- let output = helperstep(ast, store)
-    let Just(stmt, s_map, output) = helperstep(ast, store, [])
+    --let output = helperstep(ast, store)
+    let Just(stmt, s_map, output, iteration) = helperstep(ast, store, [], count)
+    print("counter:", iteration)
     mapM_ putStrLn(output)
