@@ -2,17 +2,20 @@ module Main where
 -- libraries
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import qualified Data.Map.Strict as Map
-import Text.Parsec.Prim
-import Text.Parsec.Combinator
+-- import Text.Parsec.Prim
+-- import Text.Parsec.Combinator
 import Data.List (intercalate)
 import Control.Monad (forM_)
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
+-- import Text.Parsec
+import Control.Applicative ((<$>), (<*))
 import System.IO
 import Control.Monad
 import Data.List (foldl')
 import Control.Monad(forM_)
+import Data.Either
 
 -- Defining all the data structures
 -- Boolean expressions
@@ -94,9 +97,13 @@ whileParser :: Parser Stmt
 whileParser = whiteSpace >> statement
 
 statement :: Parser Stmt
-statement =  brace statement
+statement = sequenceOfStmt
           <|> parens statement
-          <|> sequenceOfStmt
+
+-- statement = try(sequenceOfStmt)
+--           <|> try (brace statement)
+--           <|> parens statement
+
 
 -- If there are a sequences of statements separated by a semicolon
 -- use sepBy1 to parse at least one statement
@@ -111,6 +118,7 @@ statement' =   ifStmt
            <|> whileStmt
            <|> skipStmt
            <|> assignStmt
+           <|> brace statement
 
 assignStmt :: Parser Stmt
 assignStmt =
@@ -187,10 +195,27 @@ relation =   (reservedOp ">" >> return Greater)
          <|> (reservedOp "<" >> return Less)
          <|> (reservedOp "=" >> return Eq)
 
+-- parseString :: String -> Stmt
+-- parseString str = do
+--   case parse whileParser "" str of
+--     Left e  -> error $ show e
+--     Right r ->
+--       if r <* eof
+--         then error $ show str
+--         else r
+
+
 parseString :: String -> Stmt
-parseString str = case parse whileParser "" str of
-  Left e  -> error $ show e
-  Right r -> r
+parseString str =
+  case parse (whileParser <* eof) "" str of
+    Left e  -> error $ show e
+    Right r ->  r
+
+
+  -- let parsedString = parse whileParser "" str
+  -- if isRight parsedString
+  --   then parsedString
+  --   else error $ show parsedString
 
 -- Evaluating boolean expressions
 -- takes in a boolexpression and a map and outputs
@@ -350,15 +375,9 @@ main = do
     -- getContents reads everything from standard input
     contents <-  getContents
     let inputStr = (unlines (lines contents))
-    --print("content", contents)
     let ast = parseString contents
     let store = Map.empty
     let count = 0
     -- print(ast)
-
-    --let (stmt, s_map) = smallstep(ast, store)
-    --let (stmt, state) = helperstep(ast, store)
-    --let output = helperstep(ast, store)
     let Just(stmt, s_map, output, iteration) = helperstep(ast, store, [], count)
-    print("counter:", iteration)
     mapM_ putStrLn(output)
