@@ -74,6 +74,8 @@ languageDef =
                                      , "not"
                                      , "and"
                                      , "or"
+                                     , "{"
+                                     , "}"
                                      ]
            , Token.reservedOpNames = ["+", "-", "*", "/", ":="
                                      , "<", ">", "∨", "∧", "¬", "=", "^"
@@ -90,31 +92,39 @@ parens     = Token.parens     lexer -- parses surrounding parenthesis: ()
 integer    = Token.integer    lexer -- parses an integer int
 semi       = Token.semi       lexer -- parses a semicolon  ;
 whiteSpace = Token.whiteSpace lexer -- parses whitespace " "
-brace      =  Token.braces    lexer -- parses braces {}
+brace      = Token.braces    lexer -- parses braces {}
 semiSep    = Token.semiSep    lexer
 
 whileParser :: Parser Stmt
 whileParser = whiteSpace >> statement
 
 statement :: Parser Stmt
-statement = sequenceOfStmt
-          <|> parens statement
-
--- statement = try(sequenceOfStmt)
---           <|> try (brace statement)
---           <|> parens statement
-
+statement = parens statement
+          <|> whileSeq
+          <|> sequenceOfStmt
 
 -- If there are a sequences of statements separated by a semicolon
 -- use sepBy1 to parse at least one statement
 sequenceOfStmt =
-  do list <- (sepBy1 statement' semi)
+  do
+    -- reserved "{"
+    list <- (sepBy1 statement' semi)
+    -- reserved "}"
      -- If there's only one statement return it
-     return $ if length list == 1 then head list else Seq list
+    return $ if length list == 1 then head list else Seq list
+
+whileSeq =
+  do
+    reserved "{"
+    list <- (sepBy1 statement' semi)
+    reserved "}"
+     -- If there's only one statement return it
+    return $ if length list == 1 then head list else Seq list
 
 -- check which kind of statement it is
 statement' :: Parser Stmt
-statement' =   ifStmt
+statement' =  ifStmt
+           <|> whileSeq
            <|> whileStmt
            <|> skipStmt
            <|> assignStmt
@@ -128,6 +138,7 @@ assignStmt =
     return $ Assign var expr
 
 
+
 -- define the parsers for all the possible statements
 ifStmt :: Parser Stmt
 ifStmt =
@@ -139,6 +150,13 @@ ifStmt =
      stmt2 <- statement
      return $ If cond stmt1 stmt2
 
+whileStep :: Parser Stmt
+whileStep =
+  do reserved "{"
+     stmt <- whileStmt
+     reserved "}"
+     return  stmt
+
 whileStmt :: Parser Stmt
 whileStmt =
   do reserved "while"
@@ -146,8 +164,6 @@ whileStmt =
      reserved "do"
      stmt <- statement
      return $ While cond stmt
-
-
 
 skipStmt :: Parser Stmt
 skipStmt = reserved "skip" >> return Skip
@@ -195,27 +211,12 @@ relation =   (reservedOp ">" >> return Greater)
          <|> (reservedOp "<" >> return Less)
          <|> (reservedOp "=" >> return Eq)
 
--- parseString :: String -> Stmt
--- parseString str = do
---   case parse whileParser "" str of
---     Left e  -> error $ show e
---     Right r ->
---       if r <* eof
---         then error $ show str
---         else r
-
 
 parseString :: String -> Stmt
 parseString str =
   case parse (whileParser <* eof) "" str of
     Left e  -> error $ show e
     Right r ->  r
-
-
-  -- let parsedString = parse whileParser "" str
-  -- if isRight parsedString
-  --   then parsedString
-  --   else error $ show parsedString
 
 -- Evaluating boolean expressions
 -- takes in a boolexpression and a map and outputs
@@ -241,7 +242,6 @@ evalBool bexp store =
 -- Evaluating arithmetic expressions
 -- takes in arithmetic expression and a map and
 -- outputs an integer
-
 evalA :: AExpr -> Map.Map String Integer -> Integer
 evalA expr mapstore =
     case expr of
@@ -295,16 +295,15 @@ helperstep (ast, state, result, counter) =
   if counter < 10000
     then do
       case smallstep(ast, state, counter) of
-        Just(ast', state', c') -> do
-                let smap = printMap(state')
-                let resultData = cleanData(ast', smap)
-                Just(putStrLn(resultData))
-                let cleanData = filter(/= '\n') resultData
-                helperstep(ast', state', result ++ [cleanData], c'+1)
-        Nothing            ->   do
-                Just(ast, state, result, counter+1)
+          Just(ast', state', c') -> do
+                  let smap = printMap(state')
+                  let resultData = cleanData(ast', smap)
+                  Just(putStrLn(resultData))
+                  let cleanData = filter(/= '\n') resultData
+                  helperstep(ast', state', result ++ [cleanData], c'+1)
+          Nothing            ->   do
+                  Just(ast, state, result , counter+1)
     else Just(ast, state, result, counter)
-
 
 -- input: AST, s
 -- returns: remaining AST, s'
@@ -376,8 +375,8 @@ main = do
     contents <-  getContents
     let inputStr = (unlines (lines contents))
     let ast = parseString contents
+    print("ast", ast)
     let store = Map.empty
     let count = 0
-    -- print(ast)
     let Just(stmt, s_map, output, iteration) = helperstep(ast, store, [], count)
     mapM_ putStrLn(output)
