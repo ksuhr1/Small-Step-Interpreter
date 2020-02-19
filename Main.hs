@@ -23,8 +23,7 @@ data BExpr = BoolConst Bool
            | Not BExpr
            | BBinary BBinOp BExpr BExpr
            | RBinary RBinOp AExpr AExpr
-               -- deriving (Show)
-
+              -- deriving (Show)
 
 -- Binary boolean operators
 data BBinOp = And | Or deriving(Show)
@@ -37,7 +36,7 @@ data AExpr = Var String
            | IntConst Integer
            | Neg AExpr
            | ABinary ABinOp AExpr AExpr
-               -- deriving (Show)
+              -- deriving (Show)
 
 -- Arithmetic operators
 data ABinOp = Add
@@ -100,31 +99,19 @@ whileParser = whiteSpace >> statement
 
 statement :: Parser Stmt
 statement = parens statement
-          <|> whileSeq
           <|> sequenceOfStmt
 
 -- If there are a sequences of statements separated by a semicolon
 -- use sepBy1 to parse at least one statement
 sequenceOfStmt =
   do
-    -- reserved "{"
     list <- (sepBy1 statement' semi)
-    -- reserved "}"
-     -- If there's only one statement return it
-    return $ if length list == 1 then head list else Seq list
-
-whileSeq =
-  do
-    reserved "{"
-    list <- (sepBy1 statement' semi)
-    reserved "}"
      -- If there's only one statement return it
     return $ if length list == 1 then head list else Seq list
 
 -- check which kind of statement it is
 statement' :: Parser Stmt
 statement' =  ifStmt
-           <|> whileSeq
            <|> whileStmt
            <|> skipStmt
            <|> assignStmt
@@ -150,19 +137,13 @@ ifStmt =
      stmt2 <- statement
      return $ If cond stmt1 stmt2
 
-whileStep :: Parser Stmt
-whileStep =
-  do reserved "{"
-     stmt <- whileStmt
-     reserved "}"
-     return  stmt
 
 whileStmt :: Parser Stmt
 whileStmt =
   do reserved "while"
      cond <- bExpression
      reserved "do"
-     stmt <- statement
+     stmt <- statement'
      return $ While cond stmt
 
 skipStmt :: Parser Stmt
@@ -352,7 +333,7 @@ instance Show AExpr where
   show (ABinary Divide a b) = "(" ++ show a ++ "/" ++ show b ++ ")"
   show (ABinary Expon a b) = "(" ++ show a ++ "^" ++ show b ++ ")"
 
--- statements
+--statements
 instance Show Stmt where
   show Skip = "skip"
   show (Assign s a) = s ++ " := " ++ show a
@@ -375,7 +356,7 @@ main = do
     contents <-  getContents
     let inputStr = (unlines (lines contents))
     let ast = parseString contents
-    print("ast", ast)
+    -- print("ast", ast)
     let store = Map.empty
     let count = 0
     let Just(stmt, s_map, output, iteration) = helperstep(ast, store, [], count)
