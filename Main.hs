@@ -272,45 +272,43 @@ cleanData:: (Stmt, String) -> String
 cleanData (stmt, mapstore)  = do
   "⇒ "++show stmt++ ", "++ "{"++ intercalate ", " (lines mapstore)++"}"
 
-helperstep::(Stmt, Map.Map String Integer, [String], Integer ) -> Maybe(Stmt, Map.Map String Integer,[String], Integer)
-helperstep (ast, state, result, counter) =
-  if counter < 10000
+helperstep::(Stmt, Map.Map String Integer, [String] ) -> Maybe(Stmt, Map.Map String Integer,[String])
+helperstep (ast, state, result) =
+  if length result < 10000
     then do
-      case smallstep(ast, state, counter) of
-          Just(ast', state', c') -> do
+      case smallstep(ast, state) of
+          Just(ast', state') -> do
                   let smap = printMap(state')
                   let resultData = cleanData(ast', smap)
                   let cleanData = filter(/= '\n') resultData
-                  helperstep(ast', state', result ++ [cleanData], c')
+                  helperstep(ast', state', result ++ [cleanData])
           Nothing            ->   do
-                  Just(ast, state, result , counter)
-    else Just(ast, state, result, counter)
+                  Just(ast, state, result)
+    else Just(ast, state, result)
 
 -- input: AST, s
 -- returns: remaining AST, s'
-smallstep:: (Stmt, Map.Map String Integer, Integer) -> Maybe(Stmt, Map.Map String Integer, Integer)
-smallstep (stmt, store, counter) =
+smallstep:: (Stmt, Map.Map String Integer) -> Maybe(Stmt, Map.Map String Integer)
+smallstep (stmt, store) =
   case stmt of
-    Assign str a1 -> Just(Skip, Map.insert str (evalA a1 store) store, counter+1)
+    Assign str a1 -> Just(Skip, Map.insert str (evalA a1 store) store)
     Skip          -> Nothing
     If b1 c1 c2       -> do
       if evalBool b1 store == True
-        then Just(c1, store, counter+1)
-        else Just(c2, store, counter+1)
+        then Just(c1, store)
+        else Just(c2, store)
     Seq []           ->  Nothing
     Seq (x:xs)       -> do
-      case smallstep(x, store, counter) of
-        Just(x', store', c')  -> Just(Seq ([x'] ++ xs), store', c')
+      case smallstep(x, store) of
+        Just(x', store')  -> Just(Seq ([x'] ++ xs), store')
         Nothing           -> do
           if null xs
             then Nothing
-            else Just(Seq xs, store, counter+1)
+            else Just(Seq xs, store)
     While b1 s1       ->
       if evalBool b1 store
-        --then Just(If b1 (Seq([s1] ++ [While b1 s1])) Skip, store, counter+1)
-
-        then Just(Seq([s1] ++ [While b1 s1]), store, counter+1)
-        else Just(Skip, store, counter+1)
+        then Just(Seq([s1] ++ [While b1 s1]), store)
+        else Just(Skip, store)
 
 
 -- pretty printing
@@ -358,14 +356,8 @@ main = do
     contents <-  getContents
     let inputStr = (unlines (lines contents))
     let ast = parseString contents
-    -- print("ast", ast)
     let store = Map.empty
     let count = 0
-    let Just(stmt, s_map, output, iteration) = helperstep(ast, store, [], count)
+    let Just(stmt, s_map, output) = helperstep(ast, store, [])
     -- print("ast", ast)
-    -- print("iteration", iteration)
-    -- if iteration == 1000
     mapM_ putStrLn(output)
-      -- else ""
-    -- print("number iterations", iteration)
-  --  mapM_ putStrLn(output)
