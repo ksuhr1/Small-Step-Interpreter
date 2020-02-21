@@ -177,7 +177,7 @@ aTerm =  parens aExpression
      <|> liftM Var identifier
      <|> liftM IntConst integer
 
-bTerm = parens bExpression
+bTerm = try (parens bExpression)
      <|> (reserved "true"  >> return (BoolConst True ))
      <|> (reserved "false" >> return (BoolConst False))
      <|> rExpression
@@ -307,6 +307,8 @@ smallstep (stmt, store, counter) =
             else Just(Seq xs, store, counter+1)
     While b1 s1       ->
       if evalBool b1 store
+        --then Just(If b1 (Seq([s1] ++ [While b1 s1])) Skip, store, counter+1)
+
         then Just(Seq([s1] ++ [While b1 s1]), store, counter+1)
         else Just(Skip, store, counter+1)
 
