@@ -153,6 +153,7 @@ skipStmt = reserved "skip" >> return Skip
 aExpression :: Parser AExpr
 aExpression = buildExpressionParser aOperators aTerm
 
+-- boolean expression
 bExpression :: Parser BExpr
 bExpression = buildExpressionParser bOperators bTerm
 
@@ -176,7 +177,7 @@ aTerm =  parens aExpression
      <|> liftM Var identifier
      <|> liftM IntConst integer
 
-bTerm =  parens bExpression
+bTerm = parens bExpression
      <|> (reserved "true"  >> return (BoolConst True ))
      <|> (reserved "false" >> return (BoolConst False))
      <|> rExpression
@@ -279,11 +280,10 @@ helperstep (ast, state, result, counter) =
           Just(ast', state', c') -> do
                   let smap = printMap(state')
                   let resultData = cleanData(ast', smap)
-                  Just(putStrLn(resultData))
                   let cleanData = filter(/= '\n') resultData
-                  helperstep(ast', state', result ++ [cleanData], c'+1)
+                  helperstep(ast', state', result ++ [cleanData], c')
           Nothing            ->   do
-                  Just(ast, state, result , counter+1)
+                  Just(ast, state, result , counter)
     else Just(ast, state, result, counter)
 
 -- input: AST, s
@@ -291,12 +291,12 @@ helperstep (ast, state, result, counter) =
 smallstep:: (Stmt, Map.Map String Integer, Integer) -> Maybe(Stmt, Map.Map String Integer, Integer)
 smallstep (stmt, store, counter) =
   case stmt of
-    Assign str a1 -> Just(Skip, Map.insert str (evalA a1 store) store, counter)
+    Assign str a1 -> Just(Skip, Map.insert str (evalA a1 store) store, counter+1)
     Skip          -> Nothing
     If b1 c1 c2       -> do
       if evalBool b1 store == True
-        then Just(c1, store, counter)
-        else Just(c2, store, counter)
+        then Just(c1, store, counter+1)
+        else Just(c2, store, counter+1)
     Seq []           ->  Nothing
     Seq (x:xs)       -> do
       case smallstep(x, store, counter) of
@@ -304,11 +304,11 @@ smallstep (stmt, store, counter) =
         Nothing           -> do
           if null xs
             then Nothing
-            else Just(Seq xs, store, counter)
+            else Just(Seq xs, store, counter+1)
     While b1 s1       ->
       if evalBool b1 store
-        then Just(Seq([s1] ++ [While b1 s1]), store, counter)
-        else Just(Skip, store, counter)
+        then Just(Seq([s1] ++ [While b1 s1]), store, counter+1)
+        else Just(Skip, store, counter+1)
 
 
 -- pretty printing
@@ -360,4 +360,10 @@ main = do
     let store = Map.empty
     let count = 0
     let Just(stmt, s_map, output, iteration) = helperstep(ast, store, [], count)
+    -- print("ast", ast)
+    -- print("iteration", iteration)
+    -- if iteration == 1000
     mapM_ putStrLn(output)
+      -- else ""
+    -- print("number iterations", iteration)
+  --  mapM_ putStrLn(output)
