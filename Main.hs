@@ -3,16 +3,11 @@ module Main where
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import qualified Data.Map.Strict as Map
 import Data.List (intercalate)
-import Control.Monad (forM_)
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
-import Control.Applicative ((<$>), (<*))
 import System.IO
 import Control.Monad
-import Data.List (foldl')
-import Control.Monad(forM_)
-import Data.Either
 
 -- Article resource
 -- https://arxiv.org/pdf/1109.0785.pdf
@@ -23,20 +18,18 @@ data BExpr = BoolConst Bool
            | Not BExpr
            | BBinary BBinOp BExpr BExpr
            | RBinary RBinOp AExpr AExpr
-              -- deriving (Show)
 
 -- Binary boolean operators
-data BBinOp = And | Or deriving(Show)
+data BBinOp = And | Or
 
 -- Relational operators
-data RBinOp = Greater | Less | Eq deriving (Show)
+data RBinOp = Greater | Less | Eq
 
 -- Arithmetic expressions
 data AExpr = Var String
            | IntConst Integer
            | Neg AExpr
            | ABinary ABinOp AExpr AExpr
-              -- deriving (Show)
 
 -- Arithmetic operators
 data ABinOp = Add
@@ -44,7 +37,6 @@ data ABinOp = Add
             | Multiply
             | Divide
             | Expon
-               -- deriving (Show)
 
 -- Statements
 data Stmt = Seq [Stmt]
@@ -52,7 +44,6 @@ data Stmt = Seq [Stmt]
           | If BExpr Stmt Stmt
           | While BExpr Stmt
           | Skip
-             -- deriving (Show)
 
 -- define syntax for While Language
 languageDef =
@@ -92,7 +83,6 @@ integer    = Token.integer    lexer -- parses an integer int
 semi       = Token.semi       lexer -- parses a semicolon  ;
 whiteSpace = Token.whiteSpace lexer -- parses whitespace " "
 brace      = Token.braces    lexer -- parses braces {}
-semiSep    = Token.semiSep    lexer
 
 whileParser :: Parser Stmt
 whileParser = whiteSpace >> statement
@@ -194,7 +184,7 @@ relation =   (reservedOp ">" >> return Greater)
 
 parseString :: String -> Stmt
 parseString str =
-  case parse (whileParser <* eof) "" str of
+  case parse swhileParser "" str of
     Left e  -> error $ show e
     Right r ->  r
 
@@ -268,62 +258,6 @@ cleanData:: (Stmt, String) -> String
 cleanData (stmt, mapstore)  = do
   "⇒ "++show stmt++ ", "++ "{"++ intercalate ", " (lines mapstore)++"}"
 
--- helperstep::(Stmt, Map.Map String Integer, [String] ) -> Maybe(Stmt, Map.Map String Integer,[String])
--- helperstep::(Stmt, Map.Map String Integer, [String] ) -> IO
--- helperstep (ast, state, result) =
---   if length result < 10000
---     then do
---       case smallstep(ast, state) of
---           Just(ast', state') -> do
---                   let smap = printMap(state')
---                   let resultData = cleanData(ast', smap)
---                   let cleanData = filter(/= '\n') resultData
---                   print(cleanData)
---                   helperstep(ast', state', )
---                   -- helperstep(ast', state', cleanData:result)
---                   -- helperstep(ast', state', result ++ [cleanData])
---           Nothing            ->   do
---                   Just(ast, state, result)
---     else Just(ast, state, result)
-
-
--- helperstep::(Stmt, Map.Map String Integer,[String], Integer ) ->  Maybe(Stmt, Map.Map String Integer,[String], Integer)
--- helperstep (ast, state,result, counter) =
---   if counter < 10000
---     then do
---       case smallstep(ast, state, counter) of
---           Just(ast', state', c') -> do
---                   let smap = printMap(state')
---                   let resultData = cleanData(ast', smap)
---                   let cleanData = filter(/= '\n') resultData
---                   -- helperstep(ast', state', result ++ [cleanData])
---                   --print(cleanData)
---                   -- helperstep(ast', state', c'+1 )
---                   helperstep(ast', state',cleanData:result, c'+1)
---                   -- helperstep(ast', state', result ++ [cleanData])
---           Nothing            ->   do
---                   Just(ast, state, result, counter+1)
---                   -- print(cleanData)
---     else
---       Just(ast, state, result, counter)
-      -- print(cleanData)
-
---old code
--- helperstep::(Stmt, Map.Map String Integer, [String], Integer ) -> Maybe(Stmt, Map.Map String Integer,[String], Integer)
--- helperstep (ast, state, result, counter) =
---   if counter < 10000
---     then do
---       case smallstep(ast, state, counter) of
---           Just(ast', state', c') -> do
---                   let smap = printMap(state')
---                   let resultData = cleanData(ast', smap)
---                   Just(putStrLn(resultData))
---                   let cleanData = filter(/= '\n') resultData
---                   helperstep(ast', state', result ++ [cleanData], c'+1)
---           Nothing            ->   do
---                   Just(ast, state, result , counter+1)
---     else Just(ast, state, result, counter)
-
 helperstep::(Stmt, Map.Map String Integer, Integer ) -> IO (Maybe(Stmt, Map.Map String Integer, Integer))
 helperstep (ast, state, counter) =
   if counter < 10000
@@ -332,17 +266,13 @@ helperstep (ast, state, counter) =
           Just(ast', state', c') -> do
                   let smap = printMap(state')
                   let resultData = cleanData(ast', smap)
-                  -- Just(putStrLn(resultData))
                   let cleanData = filter(/= '\n') resultData
                   putStrLn(cleanData)
                   helperstep(ast', state', c'+1)
-                  --helperstep(ast', state', result ++ [cleanData], c'+1)
           Nothing            ->   do
                   return $ Just(ast, state , counter+1)
     else return (Just(ast, state, counter))
 
-
-    -- else Just(ast, state, result)
 -- input: AST, s
 -- returns: remaining AST, s'
 smallstep:: (Stmt, Map.Map String Integer, Integer) -> Maybe(Stmt, Map.Map String Integer, Integer)
@@ -366,7 +296,6 @@ smallstep (stmt, store, counter) =
       if evalBool b1 store
         then Just(Seq([s1] ++ [While b1 s1]), store, counter)
         else Just(Skip, store, counter)
-
 
 -- pretty printing
 -- Boolean expressions
@@ -414,13 +343,5 @@ main = do
     let ast = parseString contents
     let store = Map.empty
     let count = 0
-    -- helperstep(ast, store, count)
     Just(stmt, s_map, counter) <- helperstep(ast, store, count)
     return ()
-    -- mapM_ putStrLn (output)
-    --
-    -- helperstep(ast, store, count)
-
-
-    -- -- print("ast", ast)
-    ---mapM_ putStrLn (reverse output)
